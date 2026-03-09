@@ -476,7 +476,7 @@
   // CONFIG
   // ─────────────────────────────────────────────
   const SHEET_WEBAPP_URL = "https://script.google.com/a/macros/kehillah.org/s/AKfycbyo_6ZeJnrgh5kyZ_MDjqaZ9zBnxUnTAleujKTHpMhDSckGQpH1er5fEOJz6kLxPTvCKQ/exec";
-  const SHEET_URL        = "https://docs.google.com/spreadsheets/d/10wPus-kuzHu0fcgvsmAJRcunMk8PV5LdeG2r57UhN8M/edit";
+  const SHEET_URL        = "https://docs.google.com/spreadsheets/d/1OwPus-kuzHu0fcgvsmAJRcunMk8PV5LdeG2r57UhN8M/edit";
 
   let currentBarcode = null;
   let currentProduct = null;
@@ -744,9 +744,16 @@
       addedBy:      ''
     });
 
+    // Use an Image ping — browsers allow this regardless of CORS or redirects
     try {
-      await fetch(`${SHEET_WEBAPP_URL}?${params.toString()}`, { mode: 'no-cors' });
-      // no-cors means we can't read the response, but the request lands in Apps Script
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.onload  = resolve;
+        img.onerror = resolve; // Apps Script returns JSON not an image, so onerror fires — that's fine
+        img.src = `${SHEET_WEBAPP_URL}?${params.toString()}`;
+        // Fallback resolve after 8 seconds in case neither fires
+        setTimeout(resolve, 8000);
+      });
       document.getElementById('success-detail').textContent =
         `"${document.getElementById('chem-name').value.trim() || currentProduct.name}" added to the Flammables inventory.`;
       showScreen('screen-success');
