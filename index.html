@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>ThINKERLab · Chemical Inventory</title>
+  <title>Th!NKERLab · Chemical Inventory</title>
 
   <!-- ZXing for decoding barcode from a captured image -->
   <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
@@ -346,7 +347,7 @@
     </svg>
   </div>
   <div class="logo-text">
-    <h1>ThINKERLab</h1>
+    <h1>Th!NKERLab</h1>
     <p>CHEMICAL INVENTORY · FLAMMABLES</p>
   </div>
 </header>
@@ -381,7 +382,7 @@
     <div class="divider">or enter barcode manually</div>
 
     <div class="manual-wrap">
-      <input type="text" id="manual-barcode" placeholder="e.g. 032700000038" inputmode="numeric" />
+      <input type="text" id="manual-barcode" placeholder="e.g. 032700000038" inputmode="numeric" onkeydown="if(event.key==='Enter') lookupBarcode(this.value.trim())" />
       <button class="btn-go" onclick="lookupBarcode(document.getElementById('manual-barcode').value.trim())">→</button>
     </div>
   </div>
@@ -470,8 +471,8 @@
   // ─────────────────────────────────────────────
   // CONFIG
   // ─────────────────────────────────────────────
-  const SHEET_WEBAPP_URL = "YOUR_APPS_SCRIPT_WEBAPP_URL_HERE";
-  const SHEET_URL        = "YOUR_GOOGLE_SHEET_URL_HERE";
+  const SHEET_WEBAPP_URL = "https://script.google.com/a/macros/kehillah.org/s/AKfycbyo_6ZeJnrgh5kyZ_MDjqaZ9zBnxUnTAleujKTHpMhDSckGQpH1er5fEOJz6kLxPTvCKQ/exec";
+  const SHEET_URL        = "https://docs.google.com/spreadsheets/d/10wPus-kuzHu0fcgvsmAJRcunMk8PV5LdeG2r57UhN8M/edit";
 
   let currentBarcode = null;
   let currentProduct = null;
@@ -608,33 +609,35 @@
     let productName  = null;
     let manufacturer = null;
 
-    // 1. Open Food Facts
+    // 1. UPC Item DB — best free option for hardware/industrial products
     try {
-      const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`);
+      document.getElementById('loading-sub').textContent = 'Searching database 1 of 3…';
+      const r = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
       const d = await r.json();
-      if (d.status === 1 && d.product) {
-        productName  = d.product.product_name || d.product.generic_name || null;
-        manufacturer = d.product.brands || null;
+      if (d.code === 'OK' && d.items && d.items.length > 0) {
+        productName  = d.items[0].title || null;
+        manufacturer = d.items[0].brand || null;
       }
     } catch(e) {}
 
-    // 2. UPC Item DB
+    // 2. Open Products Facts — covers hardware, paint, industrial goods
     if (!productName) {
       try {
-        document.getElementById('loading-sub').textContent = 'Trying secondary database…';
-        const r = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+        document.getElementById('loading-sub').textContent = 'Searching database 2 of 3…';
+        const r = await fetch(`https://world.openproductsfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`);
         const d = await r.json();
-        if (d.code === 'OK' && d.items && d.items.length > 0) {
-          productName  = d.items[0].title || null;
-          manufacturer = d.items[0].brand || null;
+        if (d.status === 1 && d.product) {
+          productName  = d.product.product_name || null;
+          manufacturer = d.product.brands || null;
         }
       } catch(e) {}
     }
 
-    // 3. Apps Script backend
-    if (!productName && SHEET_WEBAPP_URL !== 'YOUR_APPS_SCRIPT_WEBAPP_URL_HERE') {
+    // 3. Apps Script backend — catches anything previously logged at Kehillah
+    // and can be extended with paid APIs later
+    if (!productName) {
       try {
-        document.getElementById('loading-sub').textContent = 'Trying school database…';
+        document.getElementById('loading-sub').textContent = 'Searching database 3 of 3…';
         const r = await fetch(`${SHEET_WEBAPP_URL}?action=lookup&barcode=${encodeURIComponent(barcode)}`);
         const d = await r.json();
         if (d.name) { productName = d.name; manufacturer = d.manufacturer || null; }
