@@ -601,6 +601,11 @@
     barcode = (barcode || '').trim();
     if (!barcode) return;
 
+    // Pad to 12 digits if shorter — scanners sometimes drop leading zeros from UPC-A
+    if (/^\d+$/.test(barcode) && barcode.length < 12) {
+      barcode = barcode.padStart(12, '0');
+    }
+
     currentBarcode = barcode;
     showScreen('screen-loading');
     document.getElementById('loading-title').textContent = 'Looking up product…';
@@ -609,9 +614,9 @@
     let productName  = null;
     let manufacturer = null;
 
-    // 1. UPC Item DB — best free option for hardware/industrial products
+    // 1. UPC Item DB — good hardware/industrial coverage
     try {
-      document.getElementById('loading-sub').textContent = 'Searching database 1 of 3…';
+      document.getElementById('loading-sub').textContent = 'Searching database 1 of 5…';
       const r = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
       const d = await r.json();
       if (d.code === 'OK' && d.items && d.items.length > 0) {
@@ -620,10 +625,40 @@
       }
     } catch(e) {}
 
-    // 2. Open Products Facts — covers hardware, paint, industrial goods
+    // 2. Go-UPC — excellent paint/hardware coverage
     if (!productName) {
       try {
-        document.getElementById('loading-sub').textContent = 'Searching database 2 of 3…';
+        document.getElementById('loading-sub').textContent = 'Searching database 2 of 5…';
+        const r = await fetch(`https://go-upc.com/api/v1/code/${encodeURIComponent(barcode)}?key=free`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.product && d.product.name) {
+            productName  = d.product.name || null;
+            manufacturer = d.product.brand || null;
+          }
+        }
+      } catch(e) {}
+    }
+
+    // 3. Datakick — strong hardware/paint/industrial coverage
+    if (!productName) {
+      try {
+        document.getElementById('loading-sub').textContent = 'Searching database 3 of 5…';
+        const r = await fetch(`https://www.datakick.org/api/items/${encodeURIComponent(barcode)}`);
+        if (r.ok) {
+          const d = await r.json();
+          if (d.name) {
+            productName  = d.name || null;
+            manufacturer = d.brand_name || null;
+          }
+        }
+      } catch(e) {}
+    }
+
+    // 4. Open Products Facts — covers hardware, paint, industrial goods
+    if (!productName) {
+      try {
+        document.getElementById('loading-sub').textContent = 'Searching database 4 of 5…';
         const r = await fetch(`https://world.openproductsfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`);
         const d = await r.json();
         if (d.status === 1 && d.product) {
@@ -633,11 +668,10 @@
       } catch(e) {}
     }
 
-    // 3. Apps Script backend — catches anything previously logged at Kehillah
-    // and can be extended with paid APIs later
+    // 5. Apps Script backend — catches previously logged Kehillah chemicals
     if (!productName) {
       try {
-        document.getElementById('loading-sub').textContent = 'Searching database 3 of 3…';
+        document.getElementById('loading-sub').textContent = 'Searching database 5 of 5…';
         const r = await fetch(`${SHEET_WEBAPP_URL}?action=lookup&barcode=${encodeURIComponent(barcode)}`);
         const d = await r.json();
         if (d.name) { productName = d.name; manufacturer = d.manufacturer || null; }
