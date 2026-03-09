@@ -403,8 +403,14 @@
     </div>
 
     <div class="chem-card">
-      <div class="chem-name" id="chem-name">—</div>
-      <div class="chem-manufacturer" id="chem-manufacturer">—</div>
+      <div class="field-group full" style="margin-bottom:8px;">
+        <label>Chemical Name</label>
+        <input type="text" id="chem-name" placeholder="Enter chemical name" />
+      </div>
+      <div class="field-group full" style="margin-bottom:16px;">
+        <label>Manufacturer</label>
+        <input type="text" id="chem-manufacturer" placeholder="Enter manufacturer" />
+      </div>
 
       <div class="field-row">
         <div class="field-group">
@@ -712,8 +718,8 @@
   // ─────────────────────────────────────────────
   function populateConfirm() {
     document.getElementById('barcode-display').textContent   = currentBarcode;
-    document.getElementById('chem-name').textContent         = currentProduct.name;
-    document.getElementById('chem-manufacturer').textContent = currentProduct.manufacturer;
+    document.getElementById('chem-name').value               = currentProduct.name;
+    document.getElementById('chem-manufacturer').value       = currentProduct.manufacturer;
 
     const dot        = document.getElementById('sds-dot');
     const urlDisplay = document.getElementById('sds-url-display');
@@ -744,8 +750,8 @@
     const payload = {
       action:       'log',
       barcode:      currentBarcode,
-      name:         currentProduct.name,
-      manufacturer: currentProduct.manufacturer,
+      name:         document.getElementById('chem-name').value.trim() || currentProduct.name,
+      manufacturer: document.getElementById('chem-manufacturer').value.trim() || currentProduct.manufacturer,
       sdsUrl:       currentProduct.sdsUrl,
       qty:          document.getElementById('field-qty').value.trim(),
       location:     document.getElementById('field-location').value,
