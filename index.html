@@ -1,0 +1,743 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>ThINKERLab · Chemical Inventory</title>
+
+  <!-- ZXing for decoding barcode from a captured image -->
+  <script src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@700;800&display=swap');
+
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #232636;
+      --border: #2e3246;
+      --accent: #e8f03a;
+      --accent2: #3af0b0;
+      --danger: #f0503a;
+      --text: #eef0f7;
+      --muted: #7a7f99;
+      --radius: 16px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    header {
+      padding: 20px 24px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .logo-mark {
+      width: 40px; height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: grid; place-items: center;
+      flex-shrink: 0;
+    }
+    .logo-mark svg { width: 22px; height: 22px; }
+
+    .logo-text h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+    }
+    .logo-text p {
+      font-size: 11px;
+      color: var(--muted);
+      font-family: 'Inter', sans-serif;
+      letter-spacing: 0.06em;
+    }
+
+    main {
+      padding: 28px 20px 48px;
+      max-width: 480px;
+      margin: 0 auto;
+    }
+
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── Scan screen ── */
+    .scan-label {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 8px;
+      line-height: 1.15;
+    }
+
+    .scan-sublabel {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 32px;
+      line-height: 1.6;
+    }
+
+    #camera-input {
+      display: none;
+    }
+
+    .capture-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #0f1117;
+      border: none;
+      border-radius: var(--radius);
+      padding: 22px 20px;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 18px;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      transition: transform 0.12s, background 0.12s;
+      letter-spacing: 0.01em;
+    }
+    .capture-btn:active { transform: scale(0.97); background: #d4db33; }
+
+    .capture-icon {
+      width: 32px; height: 32px;
+      flex-shrink: 0;
+    }
+
+    .preview-wrap {
+      margin-top: 20px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      display: none;
+      position: relative;
+    }
+    .preview-wrap.visible { display: block; }
+
+    #captured-img {
+      width: 100%;
+      display: block;
+      max-height: 220px;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .preview-label {
+      background: rgba(15,17,23,0.9);
+      padding: 10px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+      text-align: center;
+    }
+
+    .divider {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin: 24px 0;
+      color: var(--muted);
+      font-size: 11px;
+      font-family: 'Inter', sans-serif;
+    }
+    .divider::before, .divider::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .manual-wrap {
+      display: flex;
+      gap: 8px;
+    }
+    .manual-wrap input { flex: 1; }
+    .btn-go {
+      background: var(--accent);
+      color: #0f1117;
+      border: none;
+      border-radius: 10px;
+      padding: 12px 20px;
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      flex-shrink: 0;
+      transition: background 0.12s;
+    }
+    .btn-go:active { background: #d4db33; }
+
+    /* ── Buttons ── */
+    .btn {
+      width: 100%;
+      padding: 16px 20px;
+      border: none;
+      border-radius: var(--radius);
+      font-family: 'Inter', sans-serif;
+      font-size: 15px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .btn-primary { background: var(--accent); color: #0f1117; }
+    .btn-primary:active { transform: scale(0.97); background: #d4db33; }
+    .btn-secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-secondary:active { transform: scale(0.97); }
+
+    /* ── Loading ── */
+    .status-wrap {
+      text-align: center;
+      padding: 56px 20px;
+    }
+    .spinner {
+      width: 48px; height: 48px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-title {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .status-sub { font-size: 13px; color: var(--muted); }
+
+    /* ── Confirm ── */
+    .result-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(58,240,176,0.12);
+      border: 1px solid var(--accent2);
+      color: var(--accent2);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      margin-bottom: 20px;
+    }
+
+    .chem-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .chem-name {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 4px;
+      line-height: 1.2;
+    }
+    .chem-manufacturer { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+
+    .field-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-group.full { grid-column: 1 / -1; }
+
+    label {
+      font-family: 'Inter', sans-serif;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      text-transform: uppercase;
+    }
+
+    input, select {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 12px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      width: 100%;
+      outline: none;
+      transition: border-color 0.15s;
+      -webkit-appearance: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+    select option { background: var(--surface2); }
+
+    .sds-link-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 11px 12px;
+    }
+    .sds-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
+    .sds-dot.missing { background: var(--danger); }
+    .sds-url {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      color: var(--accent2);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+    .sds-url.missing { color: var(--muted); font-style: italic; }
+
+    .success-icon {
+      width: 64px; height: 64px;
+      background: rgba(58,240,176,0.15);
+      border: 2px solid var(--accent2);
+      border-radius: 50%;
+      display: grid; place-items: center;
+      margin: 0 auto 20px;
+      font-size: 28px;
+    }
+
+    .error-banner {
+      background: rgba(240,80,58,0.1);
+      border: 1px solid var(--danger);
+      border-radius: 12px;
+      padding: 14px 16px;
+      font-size: 13px;
+      color: var(--danger);
+      margin-top: 16px;
+      line-height: 1.5;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">
+    <svg viewBox="0 0 22 22" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M4 18 L11 4 L18 18" stroke="#0f1117" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M6.5 13 H15.5" stroke="#0f1117" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </div>
+  <div class="logo-text">
+    <h1>ThINKERLab</h1>
+    <p>CHEMICAL INVENTORY · FLAMMABLES</p>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── SCAN SCREEN ── -->
+  <div class="screen active" id="screen-scan">
+    <p class="scan-label">Add a chemical<br>to inventory.</p>
+    <p class="scan-sublabel">Tap the button, point your camera at the barcode on the container, and take a photo. The app handles the rest.</p>
+
+    <!-- capture="environment" opens the back camera natively on every phone/browser -->
+    <input type="file" id="camera-input" accept="image/*" capture="environment" onchange="onFileChosen(this)" />
+
+    <button class="capture-btn" id="scan-btn" onclick="openCamera()">
+      <svg class="capture-icon" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3" y="8" width="26" height="19" rx="3" stroke="#0f1117" stroke-width="2.2"/>
+        <circle cx="16" cy="17" r="5" stroke="#0f1117" stroke-width="2.2"/>
+        <path d="M12 8 L14 5 H18 L20 8" stroke="#0f1117" stroke-width="2" stroke-linejoin="round"/>
+        <rect x="22" y="12" width="4" height="2.5" rx="1" fill="#0f1117"/>
+      </svg>
+      Scan Barcode
+    </button>
+
+    <div class="preview-wrap" id="preview-wrap">
+      <img id="captured-img" src="" alt="Captured barcode" />
+      <div class="preview-label" id="preview-label">Reading barcode…</div>
+    </div>
+
+    <div id="scan-error" class="error-banner"></div>
+
+    <div class="divider">or enter barcode manually</div>
+
+    <div class="manual-wrap">
+      <input type="text" id="manual-barcode" placeholder="e.g. 032700000038" inputmode="numeric" />
+      <button class="btn-go" onclick="lookupBarcode(document.getElementById('manual-barcode').value.trim())">→</button>
+    </div>
+  </div>
+
+  <!-- ── LOADING SCREEN ── -->
+  <div class="screen" id="screen-loading">
+    <div class="status-wrap">
+      <div class="spinner"></div>
+      <div class="status-title" id="loading-title">Looking up product…</div>
+      <div class="status-sub" id="loading-sub">Searching chemical database</div>
+    </div>
+  </div>
+
+  <!-- ── CONFIRM SCREEN ── -->
+  <div class="screen" id="screen-confirm">
+    <div class="result-tag">
+      <span>●</span> <span id="barcode-display">BARCODE</span>
+    </div>
+
+    <div class="chem-card">
+      <div class="chem-name" id="chem-name">—</div>
+      <div class="chem-manufacturer" id="chem-manufacturer">—</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>Quantity</label>
+          <input type="text" id="field-qty" placeholder="e.g. 1 qt" />
+        </div>
+        <div class="field-group">
+          <label>Cabinet Location</label>
+          <select id="field-location">
+            <option value="">Select…</option>
+            <option>Shelf 1 (Top)</option>
+            <option>Shelf 2</option>
+            <option>Shelf 3</option>
+            <option>Shelf 4 (Bottom)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-group full" style="margin-bottom:12px;">
+        <label>SDS Link</label>
+        <div class="sds-link-row">
+          <div class="sds-dot" id="sds-dot"></div>
+          <div class="sds-url" id="sds-url-display">Searching…</div>
+        </div>
+      </div>
+
+      <div class="field-group full">
+        <label>Notes (optional)</label>
+        <input type="text" id="field-notes" placeholder="e.g. opened, check expiry" />
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="submitEntry()">Add to Inventory →</button>
+    <button class="btn btn-secondary" onclick="resetScan()">Scan Again</button>
+  </div>
+
+  <!-- ── SUCCESS SCREEN ── -->
+  <div class="screen" id="screen-success">
+    <div class="status-wrap">
+      <div class="success-icon">✓</div>
+      <div class="status-title">Logged!</div>
+      <div class="status-sub" id="success-detail">Entry added to the Flammables inventory.</div>
+    </div>
+    <button class="btn btn-primary" onclick="resetScan()">Scan Another</button>
+    <button class="btn btn-secondary" onclick="openSheet()">View Sheet →</button>
+  </div>
+
+  <!-- ── ERROR SCREEN ── -->
+  <div class="screen" id="screen-error">
+    <div class="status-wrap">
+      <div style="font-size:48px; margin-bottom:16px;">⚠</div>
+      <div class="status-title" style="color: var(--danger);">Something went wrong</div>
+      <div class="status-sub" id="error-detail">Could not complete this action.</div>
+    </div>
+    <button class="btn btn-primary" onclick="showScreen('screen-confirm')">Go Back</button>
+    <button class="btn btn-secondary" onclick="resetScan()">Start Over</button>
+  </div>
+
+</main>
+
+<canvas id="decode-canvas" style="display:none;"></canvas>
+
+<script>
+  // ─────────────────────────────────────────────
+  // CONFIG
+  // ─────────────────────────────────────────────
+  const SHEET_WEBAPP_URL = "YOUR_APPS_SCRIPT_WEBAPP_URL_HERE";
+  const SHEET_URL        = "YOUR_GOOGLE_SHEET_URL_HERE";
+
+  let currentBarcode = null;
+  let currentProduct = null;
+
+  // ─────────────────────────────────────────────
+  // Camera button — called directly from onclick
+  // ─────────────────────────────────────────────
+  function openCamera() {
+    const input = document.getElementById('camera-input');
+    input.value = '';
+    input.click();
+  }
+
+  function onFileChosen(input) {
+    if (input.files && input.files.length > 0) {
+      handleCapture({ target: input });
+    }
+  }
+
+  // ─────────────────────────────────────────────
+  // Screen management
+  // ─────────────────────────────────────────────
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    window.scrollTo(0, 0);
+  }
+
+  function resetScan() {
+    document.getElementById('camera-input').value = '';
+    document.getElementById('preview-wrap').classList.remove('visible');
+    document.getElementById('scan-error').style.display = 'none';
+    document.getElementById('manual-barcode').value = '';
+    showScreen('screen-scan');
+  }
+
+  // ─────────────────────────────────────────────
+  // Handle captured photo
+  // ─────────────────────────────────────────────
+  function handleCapture(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    document.getElementById('scan-error').style.display = 'none';
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('captured-img').src = e.target.result;
+      document.getElementById('preview-wrap').classList.add('visible');
+      document.getElementById('preview-label').textContent = 'Reading barcode…';
+      decodeFromImage(e.target.result);
+    };
+    reader.readAsDataURL(file);
+  }
+
+  // ─────────────────────────────────────────────
+  // Decode barcode from image
+  // ─────────────────────────────────────────────
+  function decodeFromImage(dataUrl) {
+    const img = new Image();
+    img.onload = function() {
+      const canvas = document.getElementById('decode-canvas');
+      canvas.width  = img.width;
+      canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+
+      // Attempt 1: ZXing
+      try {
+        const ZXing = window.ZXing;
+        if (ZXing && ZXing.MultiFormatReader) {
+          const hints = new Map();
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.UPC_A,
+            ZXing.BarcodeFormat.UPC_E,
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.CODE_39,
+            ZXing.BarcodeFormat.ITF,
+            ZXing.BarcodeFormat.QR_CODE,
+          ]);
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+
+          const reader     = new ZXing.MultiFormatReader();
+          reader.setHints(hints);
+          const lum        = new ZXing.HTMLCanvasElementLuminanceSource(canvas);
+          const bitmap     = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(lum));
+          const result     = reader.decode(bitmap);
+          if (result) { onBarcodeFound(result.getText()); return; }
+        }
+      } catch(e) { /* NotFoundException is normal — try next */ }
+
+      // Attempt 2: Native BarcodeDetector (Android Chrome)
+      if ('BarcodeDetector' in window) {
+        const detector = new BarcodeDetector({
+          formats: ['ean_13','ean_8','upc_a','upc_e','code_128','code_39','itf','qr_code']
+        });
+        detector.detect(img)
+          .then(barcodes => barcodes.length > 0 ? onBarcodeFound(barcodes[0].rawValue) : onDecodeFailure())
+          .catch(() => onDecodeFailure());
+        return;
+      }
+
+      onDecodeFailure();
+    };
+    img.src = dataUrl;
+  }
+
+  function onBarcodeFound(code) {
+    document.getElementById('preview-label').textContent = '✓  ' + code;
+    lookupBarcode(code);
+  }
+
+  function onDecodeFailure() {
+    document.getElementById('preview-label').textContent = 'Could not read barcode — try again';
+    const err = document.getElementById('scan-error');
+    err.style.display = 'block';
+    err.textContent = 'No barcode found in this photo. Try better lighting, move closer, and keep the barcode flat. Or enter the number below.';
+    document.getElementById('camera-input').value = '';
+  }
+
+  // ─────────────────────────────────────────────
+  // Barcode → Product lookup
+  // ─────────────────────────────────────────────
+  async function lookupBarcode(barcode) {
+    barcode = (barcode || '').trim();
+    if (!barcode) return;
+
+    currentBarcode = barcode;
+    showScreen('screen-loading');
+    document.getElementById('loading-title').textContent = 'Looking up product…';
+    document.getElementById('loading-sub').textContent   = 'Barcode: ' + barcode;
+
+    let productName  = null;
+    let manufacturer = null;
+
+    // 1. Open Food Facts
+    try {
+      const r = await fetch(`https://world.openfoodfacts.org/api/v0/product/${encodeURIComponent(barcode)}.json`);
+      const d = await r.json();
+      if (d.status === 1 && d.product) {
+        productName  = d.product.product_name || d.product.generic_name || null;
+        manufacturer = d.product.brands || null;
+      }
+    } catch(e) {}
+
+    // 2. UPC Item DB
+    if (!productName) {
+      try {
+        document.getElementById('loading-sub').textContent = 'Trying secondary database…';
+        const r = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${encodeURIComponent(barcode)}`);
+        const d = await r.json();
+        if (d.code === 'OK' && d.items && d.items.length > 0) {
+          productName  = d.items[0].title || null;
+          manufacturer = d.items[0].brand || null;
+        }
+      } catch(e) {}
+    }
+
+    // 3. Apps Script backend
+    if (!productName && SHEET_WEBAPP_URL !== 'YOUR_APPS_SCRIPT_WEBAPP_URL_HERE') {
+      try {
+        document.getElementById('loading-sub').textContent = 'Trying school database…';
+        const r = await fetch(`${SHEET_WEBAPP_URL}?action=lookup&barcode=${encodeURIComponent(barcode)}`);
+        const d = await r.json();
+        if (d.name) { productName = d.name; manufacturer = d.manufacturer || null; }
+      } catch(e) {}
+    }
+
+    const searchTerm   = productName
+      ? `${productName} ${manufacturer || ''} SDS safety data sheet filetype:pdf`
+      : `${barcode} SDS safety data sheet`;
+    const sdsSearchUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTerm.trim())}`;
+
+    currentProduct = {
+      barcode,
+      name:         productName  || 'Unknown Product',
+      manufacturer: manufacturer || 'Unknown Manufacturer',
+      sdsUrl:       sdsSearchUrl,
+      sdsFound:     false
+    };
+
+    // Try direct SDS link
+    if (productName && SHEET_WEBAPP_URL !== 'YOUR_APPS_SCRIPT_WEBAPP_URL_HERE') {
+      document.getElementById('loading-sub').textContent = 'Searching for SDS…';
+      try {
+        const r = await fetch(`${SHEET_WEBAPP_URL}?action=sds&name=${encodeURIComponent(productName)}&mfr=${encodeURIComponent(manufacturer || '')}`);
+        const d = await r.json();
+        if (d.sdsUrl) { currentProduct.sdsUrl = d.sdsUrl; currentProduct.sdsFound = true; }
+      } catch(e) {}
+    }
+
+    populateConfirm();
+    showScreen('screen-confirm');
+  }
+
+  // ─────────────────────────────────────────────
+  // Populate confirm screen
+  // ─────────────────────────────────────────────
+  function populateConfirm() {
+    document.getElementById('barcode-display').textContent   = currentBarcode;
+    document.getElementById('chem-name').textContent         = currentProduct.name;
+    document.getElementById('chem-manufacturer').textContent = currentProduct.manufacturer;
+
+    const dot        = document.getElementById('sds-dot');
+    const urlDisplay = document.getElementById('sds-url-display');
+
+    if (currentProduct.sdsFound) {
+      dot.className        = 'sds-dot';
+      urlDisplay.className = 'sds-url';
+      urlDisplay.textContent = 'SDS link found ✓';
+    } else {
+      dot.className        = 'sds-dot missing';
+      urlDisplay.className = 'sds-url missing';
+      urlDisplay.textContent = 'Google SDS search (auto-generated)';
+    }
+
+    document.getElementById('field-qty').value      = '';
+    document.getElementById('field-notes').value    = '';
+    document.getElementById('field-location').value = '';
+  }
+
+  // ─────────────────────────────────────────────
+  // Submit to Sheet
+  // ─────────────────────────────────────────────
+  async function submitEntry() {
+    showScreen('screen-loading');
+    document.getElementById('loading-title').textContent = 'Saving to Sheet…';
+    document.getElementById('loading-sub').textContent   = currentProduct.name;
+
+    const payload = {
+      action:       'log',
+      barcode:      currentBarcode,
+      name:         currentProduct.name,
+      manufacturer: currentProduct.manufacturer,
+      sdsUrl:       currentProduct.sdsUrl,
+      qty:          document.getElementById('field-qty').value.trim(),
+      location:     document.getElementById('field-location').value,
+      notes:        document.getElementById('field-notes').value.trim(),
+      timestamp:    new Date().toISOString(),
+      addedBy:      ''
+    };
+
+    try {
+      const res  = await fetch(SHEET_WEBAPP_URL, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        document.getElementById('success-detail').textContent =
+          `"${currentProduct.name}" added to the Flammables inventory.`;
+        showScreen('screen-success');
+      } else {
+        throw new Error(data.error || 'Unknown server error');
+      }
+    } catch(e) {
+      document.getElementById('error-detail').textContent = 'Could not save: ' + e.message;
+      showScreen('screen-error');
+    }
+  }
+
+  function openSheet() {
+    window.open(SHEET_URL, '_blank');
+  }
+</script>
+</body>
+</html>
