@@ -625,16 +625,16 @@
       }
     } catch(e) {}
 
-    // 2. Go-UPC — excellent paint/hardware coverage
+    // 2. Open EAN — large crowd-sourced product database, strong hardware coverage
     if (!productName) {
       try {
         document.getElementById('loading-sub').textContent = 'Searching database 2 of 5…';
-        const r = await fetch(`https://go-upc.com/api/v1/code/${encodeURIComponent(barcode)}?key=free`);
+        const r = await fetch(`https://opengtindb.org/?ean=${encodeURIComponent(barcode)}&cmd=ean&lang=en&ftype=json`);
         if (r.ok) {
           const d = await r.json();
-          if (d.product && d.product.name) {
-            productName  = d.product.name || null;
-            manufacturer = d.product.brand || null;
+          if (d.product && d.product[0] && d.product[0].name) {
+            productName  = d.product[0].name || null;
+            manufacturer = d.product[0].vendor || null;
           }
         }
       } catch(e) {}
