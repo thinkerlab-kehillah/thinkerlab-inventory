@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -433,10 +432,7 @@
 
       <div class="field-group full" style="margin-bottom:12px;">
         <label>SDS Link</label>
-        <div class="sds-link-row">
-          <div class="sds-dot" id="sds-dot"></div>
-          <div class="sds-url" id="sds-url-display">Searching…</div>
-        </div>
+        <input type="url" id="field-sds" placeholder="Paste SDS URL or leave as search link" />
       </div>
 
       <div class="field-group full">
@@ -720,19 +716,7 @@
     document.getElementById('barcode-display').textContent   = currentBarcode;
     document.getElementById('chem-name').value               = currentProduct.name;
     document.getElementById('chem-manufacturer').value       = currentProduct.manufacturer;
-
-    const dot        = document.getElementById('sds-dot');
-    const urlDisplay = document.getElementById('sds-url-display');
-
-    if (currentProduct.sdsFound) {
-      dot.className        = 'sds-dot';
-      urlDisplay.className = 'sds-url';
-      urlDisplay.textContent = 'SDS link found ✓';
-    } else {
-      dot.className        = 'sds-dot missing';
-      urlDisplay.className = 'sds-url missing';
-      urlDisplay.textContent = 'Google SDS search (auto-generated)';
-    }
+    document.getElementById('field-sds').value               = currentProduct.sdsUrl || '';
 
     document.getElementById('field-qty').value      = '';
     document.getElementById('field-notes').value    = '';
@@ -747,29 +731,25 @@
     document.getElementById('loading-title').textContent = 'Saving to Sheet…';
     document.getElementById('loading-sub').textContent   = currentProduct.name;
 
-    const payload = {
+    const params = new URLSearchParams({
       action:       'log',
       barcode:      currentBarcode,
       name:         document.getElementById('chem-name').value.trim() || currentProduct.name,
       manufacturer: document.getElementById('chem-manufacturer').value.trim() || currentProduct.manufacturer,
-      sdsUrl:       currentProduct.sdsUrl,
+      sdsUrl:       document.getElementById('field-sds').value.trim() || currentProduct.sdsUrl || '',
       qty:          document.getElementById('field-qty').value.trim(),
       location:     document.getElementById('field-location').value,
       notes:        document.getElementById('field-notes').value.trim(),
       timestamp:    new Date().toISOString(),
       addedBy:      ''
-    };
+    });
 
     try {
-      const res  = await fetch(SHEET_WEBAPP_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload)
-      });
+      const res  = await fetch(`${SHEET_WEBAPP_URL}?${params.toString()}`);
       const data = await res.json();
       if (data.success) {
         document.getElementById('success-detail').textContent =
-          `"${currentProduct.name}" added to the Flammables inventory.`;
+          `"${document.getElementById('chem-name').value.trim() || currentProduct.name}" added to the Flammables inventory.`;
         showScreen('screen-success');
       } else {
         throw new Error(data.error || 'Unknown server error');
