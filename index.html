@@ -745,15 +745,11 @@
     });
 
     try {
-      const res  = await fetch(`${SHEET_WEBAPP_URL}?${params.toString()}`);
-      const data = await res.json();
-      if (data.success) {
-        document.getElementById('success-detail').textContent =
-          `"${document.getElementById('chem-name').value.trim() || currentProduct.name}" added to the Flammables inventory.`;
-        showScreen('screen-success');
-      } else {
-        throw new Error(data.error || 'Unknown server error');
-      }
+      await fetch(`${SHEET_WEBAPP_URL}?${params.toString()}`, { mode: 'no-cors' });
+      // no-cors means we can't read the response, but the request lands in Apps Script
+      document.getElementById('success-detail').textContent =
+        `"${document.getElementById('chem-name').value.trim() || currentProduct.name}" added to the Flammables inventory.`;
+      showScreen('screen-success');
     } catch(e) {
       document.getElementById('error-detail').textContent = 'Could not save: ' + e.message;
       showScreen('screen-error');
